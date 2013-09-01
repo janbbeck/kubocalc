@@ -1,0 +1,117 @@
+#!/bin/bash 
+nat=24                      # number of atoms
+AtomicPositionAtomSearch=Mg
+FilePrefix=${AtomicPositionAtomSearch}2Si
+MdFileName=run_md_${FilePrefix}${nat}
+ScfFileName=run_scf_${FilePrefix}${nat}
+KuboFileName=run_kubo_${FilePrefix}${nat}
+
+
+NumberOfSets=200   # Max Number of conductivity calculations to average
+thresholddata=1.05 # convergence at 5%
+thresholdk=1.10    # convergence at 10%
+maxk=26            # maximum number of k points
+
+#clean
+if [ -a optcondkold.txt ]
+    then
+    rm optcondkold.txt
+    fi
+#converge over k points
+./randomize ${MdFileName}
+chmod +x "${MdFileName}_randomized"            
+rm -rf results/*
+date
+./${MdFileName}_randomized  
+for ((k=6; k<=maxk; k=k+2 )) 
+    do
+    T="$(date +%s)"          
+    sed "/K_POINTS (automatic)/{n; s/.*\(0 0 0\)/ $k $k $k \1/}" $ScfFileName > ${ScfFileName}_newk
+    chmod +x ${ScfFileName}_newk
+    echo "$k k points"
+    date
+    ./${ScfFileName}_newk
+    date
+    ./${KuboFileName}    
+    more results/optcond.dat |awk '{print $11}' |sed '/^$/d'|sed '/ace/d' > optcondk_nat${nat}_k${k}_1.txt
+    echo "set term png size 2000, 1000;set yrange [0:1.0]; set output 'optcondk_nat${nat}_k${k}_1.png';plot 'optcondk_nat${nat}_k${k}_1.txt' with lines" | gnuplot
+    cp results/md_${FilePrefix}${nat}.out md_${FilePrefix}_nat${nat}_1.out
+    more md_${FilePrefix}_nat${nat}_1.out |grep "temperature           ="|sed '/\*/d'|awk '{print $3}' > thermalize_nat${nat}_1.txt
+    echo "set term png size 1000, 1000; set yrange [0:1500];set output 'thermalize_nat${nat}_1.png';plot 'thermalize_nat${nat}_1.txt' with lines" | gnuplot
+    grep "ATOMIC_POSITIONS (crystal)" -A 1 md_${FilePrefix}_nat${nat}_1.out | grep $AtomicPositionAtomSearch | awk '{print $2}' > atomicpositions_nat${nat}_1.txt
+    echo "set term png size 1000, 1000; set output 'atomicpositions_nat${nat}_1.png';plot 'atomicpositions_nat${nat}_1.txt' with lines" | gnuplot
+    T="$(($(date +%s)-T))"
+    printf "Run time for last data point: %02d:%02d:%02d:%02d\n" "$((T/86400))" "$((T/3600%24))" "$((T/60%60))" "$((T%60))"
+    # if we have converged with respect to k points we can break
+    if [ -a optcondkold.txt ]
+            then
+            echo "checking for convergence with k"
+            largest=$(paste optcondk_nat${nat}_k${k}_1.txt optcondkold.txt|sed '1,10d'|awk '{value=$1/$2;value<0?-value:value; print value}' | awk '$0>x{x=$0};END{print x}')
+            echo "largest k diff: $largest thresholdk:$thresholdk k:$k"
+            compare_result=`echo "$thresholdk > $largest" | bc`
+            if [ $compare_result -ne 0 ]
+                then
+                # if we have converged with respect to number of k points we can break
+                   echo "Converged at k iteration $k"
+                   break
+                fi
+            fi
+    cp optcondk_nat${nat}_k${k}_1.txt optcondkold.txt
+    # reuse result as first iteration for next section
+    cp optcondk_nat${nat}_k${k}_1.txt Alloptcond_nat${nat}_k${k}.txt
+    cp  Alloptcond_nat${nat}_k${k}.txt optcondAverage_nat${nat}_k${k}.txt
+    temp=$k
+    done # iterate over k points
+echo "done with k"
+# Now iterate over data sets
+k=$temp
+for ((i=2; i<=NumberOfSets; ++i )) 
+    do
+    T="$(date +%s)"
+    echo "Iteration $i"
+    #it seems that the MD run is deterministic enough to warrant randomization of the initial positions of the atoms
+    ./randomize ${MdFileName}
+    chmod +x ${MdFileName}_randomized            
+    rm -rf results/*
+    ./${MdFileName}_randomized
+    date            
+    sed "/K_POINTS (automatic)/{n; s/.*\(0 0 0\)/ $k $k $k \1/}" ${ScfFileName} > ${ScfFileName}_newk
+    chmod +x ${ScfFileName}_newk
+    ./${ScfFileName}_newk
+    date
+    ./${KuboFileName}
+    date
+    more results/optcond.dat |awk '{print $11}' |sed '/^$/d'|sed '/ace/d' > optcond_nat${nat}_k${k}_${i}.txt
+    echo "set term png size 2000, 1000;set yrange [0:1.0]; set output 'optcond_nat${nat}_k${k}_${i}.png';plot 'optcond_nat${nat}_k${k}_${i}.txt' with lines" | gnuplot
+    cp results/md_${FilePrefix}${nat}.out md_${FilePrefix}_nat${nat}_${i}.out
+    more md_${FilePrefix}_nat${nat}_${i}.out |grep "temperature           ="|sed '/\*/d'|awk '{print $3}' > thermalize_nat${nat}_${i}.txt
+    echo "set term png size 1000, 1000; set yrange [0:1500];set output 'thermalize_nat${nat}_${i}.png';plot 'thermalize_nat${nat}_${i}.txt' with lines" | gnuplot
+    grep "ATOMIC_POSITIONS (crystal)" -A 1 md_${FilePrefix}_nat${nat}_${i}.out | grep $AtomicPositionAtomSearch | awk '{print $2}' > atomicpositions_nat${nat}_${i}.txt
+    echo "set term png size 1000, 1000; set output 'atomicpositions_nat${nat}_${i}.png';plot 'atomicpositions_nat${nat}_${i}.txt' with lines" | gnuplot
+    paste Alloptcond_nat${nat}_k${k}.txt optcond_nat${nat}_k${k}_${i}.txt > temp
+    mv temp Alloptcond_nat${nat}_k${k}.txt
+    T="$(($(date +%s)-T))"
+    printf "Run time for last data point: %02d:%02d:%02d:%02d\n" "$((T/86400))" "$((T/3600%24))" "$((T/60%60))" "$((T%60))"
+    cp optcondAverage_nat${nat}_k${k}.txt optcondAverageold.txt
+    cp optcondAverage_nat${nat}_k${k}.txt optcondAverage_nat${nat}_k${k}_${i}.txt
+    more Alloptcond_nat${nat}_k${k}.txt | awk '{sum=0; for(i=1; i<=NF; i++){sum+=$i}; average=sum/NF; print average}' > optcondAverage_nat${nat}_k${k}.txt
+    echo "set term png size 2000, 1000;set yrange [0:1.0]; set output 'optcondAverage_nat${nat}_k${k}.png';plot 'optcondAverage_nat${nat}_k${k}.txt' with lines" | gnuplot
+    #now compare new average to previous average to see if we have converged.
+    if [ $i -gt 4 ] # we want at least 5 data sets before checking convergence
+        then
+        largest=$(paste optcondAverage_nat${nat}_k${k}.txt optcondAverageold.txt|sed '1,10d'|awk '{value=$1/$2;value<0?-value:value; print value}' | awk '$0>x{x=$0};END{print x}')
+        rm optcondAverageold.txt
+        echo "largest: $largest thresholddata:$thresholddata"
+        compare_result=`echo "$thresholddata > $largest" | bc`
+        echo "compare_result: $compare_result"
+        if [ $compare_result -ne 0 ]
+           then
+           # if we have converged with respect to number of data points we can break
+           echo "Converged at iteration $i"
+           break
+           fi
+        fi
+done # iterate over MD configs
+        
+echo "Done!"
+

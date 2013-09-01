@@ -1,0 +1,175 @@
+#!/bin/sh
+
+# run from directory where this script is
+cd `echo $0 | sed 's/\(.*\)\/.*/\1/'` # extract pathname
+EXAMPLE_DIR=`pwd`
+
+# check whether echo has the -e option
+if test "`echo -e`" = "-e" ; then ECHO=echo ; else ECHO="echo -e" ; fi
+
+# function to test the exit status of a job
+. ../check_failure.sh
+
+$ECHO
+$ECHO "$EXAMPLE_DIR : starting MD"
+$ECHO
+
+# set the needed environment variables
+. ../environment_variables
+
+# required executables and pseudopotentials
+BIN_LIST="pw.x dos.x projwfc.x kvecs_FS.x bands_FS.x"
+PSEUDO_LIST="Al.pbe-rrkj.UPF"
+
+$ECHO
+$ECHO "  executables directory: $BIN_DIR"
+$ECHO "  pseudo directory:      $PSEUDO_DIR"
+$ECHO "  temporary directory:   $TMP_DIR"
+$ECHO "  checking that needed directories and files exist...\c"
+
+# check for directories
+for DIR in "$BIN_DIR" "$PSEUDO_DIR" ; do
+    if test ! -d $DIR ; then
+        $ECHO
+        $ECHO "ERROR: $DIR not existent or not a directory"
+        $ECHO "Aborting"
+        exit 1
+    fi
+done
+for DIR in "$TMP_DIR" "$EXAMPLE_DIR/results" ; do
+    if test ! -d $DIR ; then
+        mkdir $DIR
+    fi
+done
+cd $EXAMPLE_DIR/results
+
+# check for executables
+for FILE in $BIN_LIST ; do
+    if test ! -x $BIN_DIR/$FILE ; then
+        $ECHO
+        $ECHO "ERROR: $BIN_DIR/$FILE not existent or not executable"
+        $ECHO "Aborting"
+        exit 1
+    fi
+done
+ 
+# check for pseudopotentials
+for FILE in $PSEUDO_LIST ; do
+    if test ! -r $PSEUDO_DIR/$FILE ; then
+        $ECHO
+        $ECHO "ERROR: $PSEUDO_DIR/$FILE not existent or not readable"
+        $ECHO "Aborting"
+        exit 1
+    fi
+done
+$ECHO " done"
+
+# how to run executables
+PW_COMMAND="$PARA_PREFIX $BIN_DIR/pw.x $PARA_POSTFIX"
+KUBO_COMMAND="$PARA_PREFIX $BIN_DIR/kubo.x $PARA_POSTFIX"
+DOS_COMMAND="$PARA_PREFIX $BIN_DIR/dos.x $PARA_POSTFIX"
+PROJWFC_COMMAND="$PARA_PREFIX $BIN_DIR/projwfc.x $PARA_POSTFIX"
+KVECS_COMMAND="$BIN_DIR/kvecs_FS.x "
+BANDS_COMMAND="$BIN_DIR/bands_FS.x "
+$ECHO
+$ECHO "  running pw.x as:      $PW_COMMAND"
+$ECHO "  running dos.x as:     $DOS_COMMAND"
+$ECHO "  running projwfc.x as: $PROJWFC_COMMAND"
+$ECHO "  running kvecs_FS.x as:  $KVECS_COMMAND"
+$ECHO "  running bands_FS.x as:  $BANDS_COMMAND"
+$ECHO
+ 
+# clean TMP_DIR
+$ECHO "  cleaning $TMP_DIR...\c"
+rm -rf $TMP_DIR/*
+$ECHO " done"
+
+#the thermal expansion of Mg2Si at 800K is ~42 10^-6 K^-1
+# reference anastassakis and hawranek say 6.338 A at 300K
+# reference baranek and schamps say 6.351 A at 300K
+
+# by Y. S. Raptis et al. the expansion from 300K to 800K is 2.379%
+# so lets take the average of the data and expand by that
+# lattice spacing at 800K : 6.4954 (proably more significant digits than valid).
+
+
+
+cat > md_Mg2Si_24.in << EOF
+  &control
+   calculation='md',
+   restart_mode='from_scratch',
+   pseudo_dir = '$PSEUDO_DIR',
+   dt=7,
+   nstep = 300 ,
+   outdir='./',
+   prefix='Mg2Si24',
+   disk_io ='low'
+/
+&SYSTEM
+    ibrav = 0,
+    celldm(1) = 1.889725989,
+    ntyp = 2,
+    nat = 24,
+    ecutwfc =50.0,
+    occupations =  'smearing',
+    degauss = 0.004,
+    smearing = 'fd'
+    nosym = .true.
+/
+ &electrons
+    electron_maxstep = 999 ,
+    conv_thr = 1.0e-6 ,
+    mixing_beta = 0.3 ,
+    startingwfc = 'atomic+random' ,
+/
+ &ions
+    wfc_extrapolation = 'second_order',
+    ion_temperature = 'rescale-v' ,
+    tempw = 800.0 ,
+    nraise = 20 ,
+
+/
+
+ATOMIC_SPECIES
+ Si  28.086 Si.pz-vbc.UPF
+ Mg  12.0000 Mg.pz-n-vbc.UPF
+ATOMIC_POSITIONS (crystal)
+ Si      0.00000000  0.00000000  0.00000000
+ Mg      0.12500000  0.12500000  0.12500000
+ Mg      0.37500000  0.37500000  0.37500000
+ Si      0.50000000  0.00000000  0.00000000
+ Mg      0.62500000  0.12500000  0.12500000
+ Mg      0.87500000  0.37500000  0.37500000
+ Si      0.00000000  0.50000000  0.00000000
+ Mg      0.12500000  0.62500000  0.12500000
+ Mg      0.37500000  0.87500000  0.37500000
+ Si      0.50000000  0.50000000  0.00000000
+ Mg      0.62500000  0.62500000  0.12500000
+ Mg      0.87500000  0.87500000  0.37500000
+ Si      0.00000000  0.00000000  0.50000000
+ Mg      0.12500000  0.12500000  0.62500000
+ Mg      0.37500000  0.37500000  0.87500000
+ Si      0.50000000  0.00000000  0.50000000
+ Mg      0.62500000  0.12500000  0.62500000
+ Mg      0.87500000  0.37500000  0.87500000
+ Si      0.00000000  0.50000000  0.50000000
+ Mg      0.12500000  0.62500000  0.62500000
+ Mg      0.37500000  0.87500000  0.87500000
+ Si      0.50000000  0.50000000  0.50000000
+ Mg      0.62500000  0.62500000  0.62500000
+ Mg      0.87500000  0.87500000  0.87500000
+CELL_PARAMETERS (cubic)
+ 10.60694378  3.75012094  6.49540000
+ 0.00000000  11.25036282  6.49540000
+ 0.00000000  0.00000000  12.99080000
+K_POINTS (automatic)
+ 1 1 1 0 0 0
+
+EOF
+
+$ECHO "  running the MD calculation for Mg2Si...\c"
+mpiexec -n 8 $PW_COMMAND  < md_Mg2Si_24.in > md_Mg2Si24.out
+check_failure $?
+$ECHO " done"
+
+

@@ -1,0 +1,163 @@
+#!/bin/sh
+
+# run from directory where this script is
+cd `echo $0 | sed 's/\(.*\)\/.*/\1/'` # extract pathname
+EXAMPLE_DIR=`pwd`
+
+# check whether echo has the -e option
+if test "`echo -e`" = "-e" ; then ECHO=echo ; else ECHO="echo -e" ; fi
+
+# function to test the exit status of a job
+. ../check_failure.sh
+
+$ECHO
+$ECHO "$EXAMPLE_DIR : starting SCF"
+$ECHO
+
+# set the needed environment variables
+. ../environment_variables
+
+# required executables and pseudopotentials
+BIN_LIST="pw.x dos.x projwfc.x kvecs_FS.x bands_FS.x"
+PSEUDO_LIST="Al.pbe-rrkj.UPF"
+
+$ECHO
+$ECHO "  executables directory: $BIN_DIR"
+$ECHO "  pseudo directory:      $PSEUDO_DIR"
+$ECHO "  temporary directory:   $TMP_DIR"
+$ECHO "  checking that needed directories and files exist...\c"
+
+# check for directories
+for DIR in "$BIN_DIR" "$PSEUDO_DIR" ; do
+    if test ! -d $DIR ; then
+        $ECHO
+        $ECHO "ERROR: $DIR not existent or not a directory"
+        $ECHO "Aborting"
+        exit 1
+    fi
+done
+for DIR in "$TMP_DIR" "$EXAMPLE_DIR/results" ; do
+    if test ! -d $DIR ; then
+        mkdir $DIR
+    fi
+done
+cd $EXAMPLE_DIR/results
+
+# check for executables
+for FILE in $BIN_LIST ; do
+    if test ! -x $BIN_DIR/$FILE ; then
+        $ECHO
+        $ECHO "ERROR: $BIN_DIR/$FILE not existent or not executable"
+        $ECHO "Aborting"
+        exit 1
+    fi
+done
+ 
+# check for pseudopotentials
+for FILE in $PSEUDO_LIST ; do
+    if test ! -r $PSEUDO_DIR/$FILE ; then
+        $ECHO
+        $ECHO "ERROR: $PSEUDO_DIR/$FILE not existent or not readable"
+        $ECHO "Aborting"
+        exit 1
+    fi
+done
+$ECHO " done"
+
+# how to run executables
+PW_COMMAND="$PARA_PREFIX $BIN_DIR/pw.x $PARA_POSTFIX"
+KUBO_COMMAND="$PARA_PREFIX $BIN_DIR/kubo.x $PARA_POSTFIX"
+DOS_COMMAND="$PARA_PREFIX $BIN_DIR/dos.x $PARA_POSTFIX"
+PROJWFC_COMMAND="$PARA_PREFIX $BIN_DIR/projwfc.x $PARA_POSTFIX"
+KVECS_COMMAND="$BIN_DIR/kvecs_FS.x "
+BANDS_COMMAND="$BIN_DIR/bands_FS.x "
+$ECHO
+$ECHO "  running pw.x as:      $PW_COMMAND"
+$ECHO "  running dos.x as:     $DOS_COMMAND"
+$ECHO "  running projwfc.x as: $PROJWFC_COMMAND"
+$ECHO "  running kvecs_FS.x as:  $KVECS_COMMAND"
+$ECHO "  running bands_FS.x as:  $BANDS_COMMAND"
+$ECHO
+ 
+# time step for molecular dynamics is in Rydberg atomic units 1 a.u.=4.8378 * 10^-17 s
+# phys rev b 38 2 methfessel states fundamental freq of Si is ~42.25 Thz
+# 1/10 of fundamental is about 50.0 a.u. then
+
+# degauss should be kT in eV
+# k = 8.6173324(78)×10-5 eV/K
+# at 100K : 0.0086173324
+# at 500K : 0.043086662
+# at 800K : 0.0689386592
+
+cat > scf_Al_32.in << EOF
+  &control
+    calculation='scf',
+    restart_mode='restart',
+    pseudo_dir = '$PSEUDO_DIR',
+    outdir='./',
+    disk_io='low',
+    wfcdir='./',
+    wf_collect=.true.,
+    prefix='Al32',
+/
+ &system
+    ibrav = 1,
+    celldm(1) = 15.518, 
+    nat=  32, ntyp= 1, ecutwfc =50.0
+    occupations =  'smearing',
+    degauss = 0.004,
+    smearing = 'fd'
+    nosym = .true.
+/
+ &electrons
+    electron_maxstep = 999 ,
+    conv_thr = 1.0e-6 ,
+    mixing_beta = 0.7 ,
+    startingwfc = 'atomic+random' ,
+/
+ATOMIC_SPECIES
+ Al  26.98 Al.pbe-rrkj.UPF
+ATOMIC_POSITIONS crystal
+ Al  0.000000  0.000000  0.000000
+ Al  0.250000  0.000000  0.250000
+ Al  0.250000  0.250000  0.000000
+ Al  0.000000  0.250000  0.250000
+ Al  0.000000  0.000000  0.500000
+ Al  0.250000  0.000000  0.750000
+ Al  0.250000  0.250000  0.500000
+ Al  0.000000  0.250000  0.750000
+ Al  0.000000  0.500000  0.000000
+ Al  0.250000  0.500000  0.250000
+ Al  0.250000  0.750000  0.000000
+ Al  0.000000  0.750000  0.250000
+ Al  0.000000  0.500000  0.500000
+ Al  0.250000  0.500000  0.750000
+ Al  0.250000  0.750000  0.500000
+ Al  0.000000  0.750000  0.750000
+ Al  0.500000  0.000000  0.000000
+ Al  0.750000  0.000000  0.250000
+ Al  0.750000  0.250000  0.000000
+ Al  0.500000  0.250000  0.250000
+ Al  0.500000  0.000000  0.500000
+ Al  0.750000  0.000000  0.750000
+ Al  0.750000  0.250000  0.500000
+ Al  0.500000  0.250000  0.750000
+ Al  0.500000  0.500000  0.000000
+ Al  0.750000  0.500000  0.250000
+ Al  0.750000  0.750000  0.000000
+ Al  0.500000  0.750000  0.250000
+ Al  0.500000  0.500000  0.500000
+ Al  0.750000  0.500000  0.750000
+ Al  0.750000  0.750000  0.500000
+ Al  0.500000  0.750000  0.750000
+K_POINTS (automatic)
+  10 10 10 0 0 0
+
+EOF
+
+$ECHO "  running the SCF calculation for Al...\c"
+mpiexec -n 8 $PW_COMMAND -ntg 4 < scf_Al_32.in > scf_Al_32.out
+#$PW_COMMAND < scf_Al_32.in > scf_Al_32.out
+check_failure $?
+$ECHO " done"
+
