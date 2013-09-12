@@ -4,7 +4,6 @@ program kubocalc
 !
 ! Lazaro Calderin,  calderin@lcalderin.net
 ! Jan Beck       ,  kubocalc@janbeck.com
-! Calderin et al
 
 ! important references:
 ! - Calderin et al.; Structural, dynamic, and electronic properties of liquid tin: An ab initio molecular dynamics study
@@ -63,7 +62,7 @@ implicit none
   real(DP), allocatable    :: focc(:,:)  ! State occupations (fermi-dirac)
 
   complex(DP), allocatable    :: dipolem(:,:,:,:), sigma(:,:,:)      ! Dipole matrix elements andconductivity
-  complex(DP), allocatable    :: L12(:,:,:),L21(:,:,:), L12_symmetric(:,:,:),L22aa(:,:,:) ,L22ab(:,:,:)  ,L22bb(:,:,:) 
+  complex(DP), allocatable    :: L11(:,:,:),L12(:,:,:),L21(:,:,:), L12_symmetric(:,:,:),L22aa(:,:,:) ,L22ab(:,:,:)  ,L22bb(:,:,:) 
   complex(DP), allocatable    :: thermopower(:,:,:),thermopower_symmetric(:,:,:),thermopower1(:,:,:),thermopower2(:,:,:)  
   complex(DP), allocatable    :: thermal_conductivity(:,:,:)
 
@@ -129,6 +128,8 @@ implicit none
   !
   allocate( sigma(3,3,nw), STAT=ierr )
   if (ierr/=0) CALL errore('optcond','allocating sigma(w)', ABS(ierr) )
+  allocate( L11(3,3,nw), STAT=ierr )
+  if (ierr/=0) CALL errore('optcond','allocating L11(w)', ABS(ierr) )
   allocate( L12(3,3,nw), STAT=ierr )
   if (ierr/=0) CALL errore('optcond','allocating L12(w)', ABS(ierr) )
   allocate( L21(3,3,nw), STAT=ierr )
@@ -182,7 +183,7 @@ implicit none
   !
 
 !$OMP PARALLEL
-write(*,*) "Hello"
+write(*,*) "Hello. Starting an OMP thread...."
 !$OMP END PARALLEL
 
 
@@ -321,7 +322,7 @@ write(*,*) "Hello"
                  ee = ( et(ib2,ik) - et(ib1,ik) )*RYTOEV - wgrid(iw)
                  e_minus_mu1 = (et(ib1,ik) - ef) * RYTOEV
                  e_minus_mu2 = (et(ib2,ik) - ef) * RYTOEV
-                 e_minus_mu_symmetric = ( (et(ib1,ik) - et(ib2,ik)) / 2 - ef) * RYTOEV
+                 e_minus_mu_symmetric = ( (et(ib1,ik) + et(ib2,ik)) / 2 - ef) * RYTOEV
                  do ix1 = 1, 3
                     do ix2 = 1, 3 
                        thesum = ( wg(ib1,ik) - wg(ib2,ik) )   
@@ -331,9 +332,9 @@ write(*,*) "Hello"
                        cmaux1(ix1, ix2)          = cmaux1(ix1,ix2)          + e_minus_mu1               * thesum2 * thesum1 * thesum
                        cmaux2(ix1, ix2)          = cmaux2(ix1,ix2)          + e_minus_mu2               * thesum2 * thesum1 * thesum
                        cmaux_symmetric(ix1, ix2) = cmaux_symmetric(ix1,ix2) + e_minus_mu_symmetric      * thesum2 * thesum1 * thesum
-                       cmaux22aa(ix1, ix2)       = cmaux22aa(ix1,ix2)       + e_minus_mu1 * e_minus_mu1 * thesum2 * thesum1 * thesum
+                       cmaux22aa(ix1, ix2)       = cmaux22aa(ix1,ix2)       + e_minus_mu1 * e_minus_mu2 * thesum2 * thesum1 * thesum
                        cmaux22ab(ix1, ix2)       = cmaux22ab(ix1,ix2)       + e_minus_mu1 * e_minus_mu2 * thesum2 * thesum1 * thesum
-                       cmaux22bb(ix1, ix2)       = cmaux22bb(ix1,ix2)       + e_minus_mu2 * e_minus_mu2 * thesum2 * thesum1 * thesum
+                       cmaux22bb(ix1, ix2)       = cmaux22bb(ix1,ix2)       + e_minus_mu_symmetric*e_minus_mu_symmetric * thesum2 * thesum1 * thesum
                     enddo
                  enddo
 
@@ -408,24 +409,22 @@ write(*,*) "Hello"
   aux = PI * ELECTRON_SI**2 * (H_PLANCK_SI/tpi)**2 / & 
         (ELECTRONMASS_SI**2*omega*BOHR_RADIUS_SI**3)  
 
-  aux = aux * H_PLANCK_SI/tpi * 6.24150974d18        ! Correcting for w given as hbar w and in eV
-  aux = aux / BOHR_RADIUS_SI**2                      ! Correcting for grad. given in 1/Bohr^2
-  aux = aux * 6.24150974d18                          ! Correcting for sg given in eV  
-  aux = aux / 1.0E8_DP                               ! Correcting for 1/(microohm centimeter) units
-  sigma = aux * sigma                                ! Change sigma to 1/(microohm centimeter)
-  L12   = aux * L12                                  ! change L12 in same way as sigma
-  L12   = L12 * 1.0E8_DP                             ! 1.0E8_DP is fixing units  from 1/uohm-cm to 1/ohm-m
-  L12   = L12 * 1.602176487E-19_DP                   ! change eV to Joule                      
-  thermopower1 = L12 / ELECTRON_SI / temperature
-  L21   = aux * L21                                  ! change L21 in same way as sigma
-  L21   = L21 * 1.0E8_DP                             ! 1.0E8_DP is fixing units  from 1/uohm-cm to 1/ohm-m
-  L21   = L21 * 1.602176487E-19_DP                   ! change eV to Joule                      
-  thermopower2 = L21 / ELECTRON_SI / temperature  ! sigma is L11 in wrong units, so multiply
-  thermopower  = (L21 + L12)/2.0_DP                  ! wont work like this....doing it by hand in the printout....
-  L12_symmetric   = aux * L12_symmetric                                  ! change L12_symmetric in same way as sigma
-  L12_symmetric   = L12_symmetric * 1.0E8_DP                             ! 1.0E8_DP is fixing units  from 1/uohm-cm to 1/ohm-m
-  L12_symmetric   = L12_symmetric * 1.602176487E-19_DP                   ! change eV to Joule                      
-  thermopower_symmetric = L12_symmetric/ (sigma * 1.0E8_DP) / ELECTRON_SI / temperature
+  aux = aux * H_PLANCK_SI/tpi * 6.24150974d18            ! Correcting for w given as hbar w and in eV
+  aux = aux / BOHR_RADIUS_SI**2                          ! Correcting for grad. given in 1/Bohr^2
+  aux = aux * 6.24150974d18                              ! Correcting for sg given in eV  
+  aux = aux / 1.0E8_DP                                   ! Correcting for 1/(microohm centimeter) units
+  sigma = aux * sigma                                    ! Change sigma to 1/(microohm centimeter)
+  L11   = aux * sigma                                    ! L11 is sigma   
+  L12   = aux * L12                                      ! change L12 units in same way as sigma; now eV/uohm-cm
+  L12   = L12 * 1.602176487E-19_DP                       ! fixing units  from eV/uohm-cm to Joule/uohm-cm
+  thermopower1 = L12 / L11 / temperature/ELECTRON_SI     ! now Joule/(uohm-com) * (uohm-cm) / K / Coulomb = J/K/C = Volts/Kelvin
+  L21   = aux * L21                                      ! change L21 units in same way as sigma; now eV/uohm-cm
+  L21   = L21 * 1.602176487E-19_DP                       ! fixing units  from eV/uohm-cm to Joule/uohm-cm                   
+  thermopower2 = L21 / L11 / temperature /ELECTRON_SI    ! now Joule/(uohm-com) * (uohm-cm) / K / Coulomb = J/K/C = Volts/Kelvin   
+  thermopower  = (L21 + L12)/2.0_DP                      ! wont work like this....doing it by hand in the printout....
+  L12_symmetric   = aux * L12_symmetric                  ! change L12_symmetric in same way as sigma; now eV/uohm-cm
+  L12_symmetric   = L12_symmetric * 1.602176487E-19_DP   ! fixing units  from eV/uohm-cm to Joule/uohm-cm                  
+  thermopower_symmetric = L12_symmetric/ L11 / temperature /ELECTRON_SI ! now Joule/(uohm-com) * (uohm-cm) / K / Coulomb = J/K/C = Volts/Kelvin
   L22aa   = aux * L22aa                                  ! change L22 in same way as sigma
   L22aa   = L22aa * 1.0E8_DP                             ! 1.0E8_DP is fixing units  from 1/uohm-cm to 1/ohm-m
   L22aa   = L22aa * 1.602176487E-19_DP                   ! change eV to Joule                      
@@ -443,12 +442,11 @@ write(*,*) "Hello"
   open(11,file='optcond.dat', action='write')
   write(11,'(A)') '# Electric conductivity tensor in the xyz system of reference'
   write(11,*) '# Rough estimate of electrical conductivity in 1/(microohm*cm)', 2.0_DP * conductivity_sum
-  write(11,*) '# Rough estimate of electrical resistivity in microohm*cm',  2.0_DP / conductivity_sum
   write(11,'(A)'             ) '#      hbar*w (eV)                           sigma(w) ( 1/(microohm*cm) )'
   write(11,'(A)',advance='no') '# eV                               11                  12                  13'
   write(11,'(A)',advance='no') '                  21                  22                  23                  31'
   write(11,'(A)',advance='no') '                  32                  33               trace/3      '
-  write(11,'(A)',advance='no') 'thermopower1(experimental)  thermopower2(experimental)  thermopower(experimental) '
+  write(11,'(A)',advance='no') 'thermopowerL12(experimental)  thermopowerL21(experimental)  thermopowerL12_L21(experimental) '
   write(11,'(A)') 'thermopower_symmetric(experimental) thermal_conductivity(very_experimental)'
 
   do iw = 1, nw
