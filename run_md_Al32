@@ -123,7 +123,7 @@ cat > md_Al_32.in << EOF
     celldm(1) = 15.518, 
     nat=  32, ntyp= 1, ecutwfc =50.0
     occupations =  'smearing',
-    degauss = 0.004,
+    degauss = 0.0689386592,
     smearing = 'fd'
     nosym = .true.
 /
