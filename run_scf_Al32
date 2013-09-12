@@ -84,7 +84,7 @@ $ECHO
 # 1/10 of fundamental is about 50.0 a.u. then
 
 # degauss should be kT in eV
-# k = 8.6173324(78)×10-5 eV/K
+# k = 8.6173324(78)Ã—10-5 eV/K
 # at 100K : 0.0086173324
 # at 500K : 0.043086662
 # at 800K : 0.0689386592
@@ -105,7 +105,7 @@ cat > scf_Al_32.in << EOF
     celldm(1) = 15.518, 
     nat=  32, ntyp= 1, ecutwfc =50.0
     occupations =  'smearing',
-    degauss = 0.004,
+    degauss = 0.0689386592,
     smearing = 'fd'
     nosym = .true.
 /
