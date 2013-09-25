@@ -76,11 +76,10 @@ implicit none
 
   !
   ! constant definitions
-  !
-  nw   = 1000          ! Number of points in the frequency grid
+  !       
   wmax = 6.0_dp        ! Maximum frequency in eV
   dw   = 0.001         ! Frecuency step
-  nw   = int(wmax/dw)
+  nw   = int(wmax/dw)  ! Number of points in the frequency grid
   write(*,*) "Number of points in the frequency grid: ", nw
 
   call environment_start( 'POST-PROC' )
@@ -425,11 +424,12 @@ write(*,*) "Hello. Starting an OMP thread...."
   L12_symmetric   = aux * L12_symmetric                  ! change L12_symmetric in same way as sigma; now eV/uohm-cm
   L12_symmetric   = L12_symmetric * 1.602176487E-19_DP   ! fixing units  from eV/uohm-cm to Joule/uohm-cm                  
   thermopower_symmetric = L12_symmetric/ L11 / temperature /ELECTRON_SI ! now Joule/(uohm-com) * (uohm-cm) / K / Coulomb = J/K/C = Volts/Kelvin
-  L22aa   = aux * L22aa                                  ! change L22 in same way as sigma
-  L22aa   = L22aa * 1.0E8_DP                             ! 1.0E8_DP is fixing units  from 1/uohm-cm to 1/ohm-m
-  L22aa   = L22aa * 1.602176487E-19_DP                   ! change eV to Joule                      
-  L22aa   = L22aa * 1.602176487E-19_DP                   ! change second eV to Joule   
-  thermal_conductivity = (L22aa - (L12 * L21 / (sigma * 1.0E8_DP))) * 1/(ELECTRON_SI*ELECTRON_SI*temperature)
+  L22bb   = aux * L22bb                                                                  ! change L22 units in same way as sigma; now eV^2/uohm-cm
+  thermal_conductivity = (L22bb - (L12_symmetric * L12_symmetric / L11))/temperature     ! now eV^2/uohm-cm-kelvin
+  thermal_conductivity   = thermal_conductivity * 1.602176487E-19_DP *1.602176487E-19_DP ! change eV^2 to Joule^2. Now Joule^2/uohm-cm-kelvin                      
+  thermal_conductivity   = thermal_conductivity * 1.0E8_DP                               ! 1.0E8_DP is fixing units  from Joule^2/uohm-cm-kelvin to Joule^2/ohm-m-kelvin
+                                                                                         ! Joule^2/ohm-m-kelvin = Watts-coulomb^2/meter-kelvin
+  thermal_conductivity   = thermal_conductivity /ELECTRON_SI/ELECTRON_SI                 ! Now Watts/meter-kelvin
 
   ! performing simple integral for DC conductivity estimation
   conductivity_sum = 0.0_DP
