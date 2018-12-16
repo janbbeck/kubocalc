@@ -1,5 +1,8 @@
 This program is currently designed to be compiled for quantum espresso 4.2.1
 
+Lazaro Calderin et al. have programmed a new code with similar capabilities for newer versions of Quantum Espresso and compatible with PAW pseudopotentials. Here:http://www.qtp.ufl.edu/ofdft/research/computation.shtml
+Paper for that (covering most of the theory behing kubocalc as well):https://www.sciencedirect.com/science/article/pii/S0010465517302539
+
 Instructions to get up and running:
 1. Download Quantum Espresso program and examples and decompress and change the current directory to the Quantum Espresso directory
 2. configure the build to disable MPI and enable OpenMP ./configure --disable-parallel --enable-openmp
