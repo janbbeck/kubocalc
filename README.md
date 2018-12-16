@@ -5,7 +5,7 @@ This program is currently designed to be compiled for quantum espresso 4.2.1
 
 ## Similar Work
 Lazaro Calderin et al. have programmed a new code with similar capabilities for newer versions of Quantum Espresso and compatible with PAW pseudopotentials. Here:http://www.qtp.ufl.edu/ofdft/research/computation.shtml
-Paper for that (covering most of the theory behing kubocalc as well):https://www.sciencedirect.com/science/article/pii/S0010465517302539
+Paper for that (covering most of the theory behind kubocalc as well):https://www.sciencedirect.com/science/article/pii/S0010465517302539
 
 ## Instructions to get up and running:
 1. Download Quantum Espresso program and examples and decompress and change the current directory to the Quantum Espresso directory
