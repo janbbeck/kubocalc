@@ -1,6 +1,6 @@
 # Overview
 Kubo-Greenwood based Quantum Espresso plugin to calculate electrical and thermal conductivity and Seebeck coefficient. 
-##Requirements
+## Requirements
 This program is currently designed to be compiled for quantum espresso 4.2.1
 
 ## Similar Work
